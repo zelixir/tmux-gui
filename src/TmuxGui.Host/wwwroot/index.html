@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tmux-gui</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===== 顶部栏 ===== -->
+    <header id="topbar">
+      <span class="logo">tmux-gui</span>
+      <select id="scopeSelect" title="切换操作范围（本机 tmux / psmux / SSH 服务器）">
+        <option value="local">本机 tmux</option>
+        <option value="psmux">本机 psmux</option>
+        <!-- SSH 服务器选项由 Topbar.refreshServers() 动态填充 -->
+      </select>
+      <span class="spacer"></span>
+      <span id="connState"></span>
+    </header>
+
+    <!-- ===== 主体 ===== -->
+    <div id="main">
+
+      <!-- 侧边栏：SSH 服务器 / 收藏命令 -->
+      <aside id="sidebar">
+        <section class="side-section" id="serversSection">
+          <div class="side-header" data-toggle="servers">
+            <span class="arrow">▾</span>SSH 服务器
+          </div>
+          <div class="side-body" id="serversBody"></div>
+        </section>
+        <section class="side-section" id="favoritesSection">
+          <div class="side-header" data-toggle="favorites">
+            <span class="arrow">▾</span>收藏命令
+          </div>
+          <div class="side-body" id="favBody"></div>
+        </section>
+      </aside>
+
+      <!-- 主区 -->
+      <div id="content">
+
+        <!-- 左列：会话 → 窗口 → 面板树 -->
+        <div id="treePane">
+          <div class="tree-toolbar">
+            <button id="btnNewSession" title="新建会话">+会话</button>
+            <button id="btnNewWindow" title="新建窗口">+窗口</button>
+            <button id="btnSplitH" title="左右分屏">|分屏</button>
+            <button id="btnSplitV" title="上下分屏">—分屏</button>
+            <button id="btnNextWin" title="下一窗口">下窗▶</button>
+            <button id="btnPrevWin" title="上一窗口">◀上窗</button>
+            <button id="btnRefresh" title="刷新树">刷新</button>
+            <button id="btnCmdDrawer" title="打开 tmux 命令提示符抽屉">命令行</button>
+            <button id="btnOptDrawer" title="查看/编辑 tmux 选项">选项</button>
+          </div>
+          <div id="tree"></div>
+        </div>
+
+        <!-- 右侧：输出查看器 -->
+        <div id="viewerPane">
+          <div class="viewer-toolbar">
+            <label for="layoutSelect" style="font-size:12px;color:var(--fg-dim)">布局</label>
+            <select id="layoutSelect">
+              <option value="">（选择布局）</option>
+              <option value="even-horizontal">水平均分</option>
+              <option value="even-vertical">垂直均分</option>
+              <option value="main-horizontal">主水平</option>
+              <option value="main-vertical">主垂直</option>
+              <option value="tiled">平铺</option>
+            </select>
+            <span class="sep"></span>
+            <button id="rotF" title="轮换面板（向前）">轮换▶</button>
+            <button id="rotB" title="轮换面板（向后）">◀轮换</button>
+            <span class="sep"></span>
+            <button id="rsL" class="icon" title="面板左移（缩小左侧）">◀</button>
+            <button id="rsR" class="icon" title="面板右移（扩大右侧）">▶</button>
+            <button id="rsU" class="icon" title="面板上移（扩大上方）">▲</button>
+            <button id="rsD" class="icon" title="面板下移（扩大下方）">▼</button>
+          </div>
+          <div id="viewerTitle">（未选择面板）</div>
+          <div id="viewerEmpty">在左侧树中选择一个面板以查看输出</div>
+          <div id="outputWrap" style="display:none"><pre id="output"></pre></div>
+
+          <!-- 底部输入条 -->
+          <div id="inputBar">
+            <input id="cmdInput" type="text" placeholder="输入发送到所选面板的命令（Enter 发送）" autocomplete="off">
+            <button id="sendBtn">发送</button>
+            <button id="sp-Cc" class="special" title="Ctrl+C">C-c</button>
+            <button id="sp-Cd" class="special" title="Ctrl+D">C-d</button>
+            <button id="sp-Tab" class="special" title="Tab">Tab</button>
+            <button id="sp-↑" class="special" title="方向键上">↑</button>
+            <button id="sp-↓" class="special" title="方向键下">↓</button>
+            <button id="sp-Esc" class="special" title="Esc">Esc</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 抽屉：tmux 命令提示符 / 选项编辑 ===== -->
+  <div id="drawerMask"></div>
+  <div id="drawer">
+    <div class="drawer-header">
+      <span id="drawerTitle">tmux 命令提示符</span>
+      <button id="drawerClose" class="icon" title="关闭抽屉">✕</button>
+    </div>
+    <div class="drawer-body">
+      <!-- 命令提示符区 -->
+      <pre id="cmdOutput"></pre>
+      <div style="display:flex;gap:6px">
+        <input id="cmdInputBox" type="text" placeholder="tmux 命令参数，如 list-sessions（Enter 执行）" autocomplete="off" style="flex:1">
+        <button id="cmdRunBtn">执行</button>
+      </div>
+      <span class="sep" style="height:1px;background:var(--border)"></span>
+      <!-- 选项区 -->
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <strong style="font-size:12px;color:var(--fg-dim)">tmux 选项（show-options）</strong>
+        <button id="optionsReload" title="重新加载选项">重新加载</button>
+      </div>
+      <div id="optionsList"></div>
+    </div>
+  </div>
+
+  <!-- ===== 模态框 ===== -->
+  <div id="modalMask">
+    <div id="modal">
+      <div class="modal-header" id="modalTitle"></div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- ===== Toast 容器 ===== -->
+  <div id="toasts"></div>
+
+  <!-- 模块脚本：bridge 先于其他（定义全局 Bridge/esc/toast/checkResult），app.js 最后启动 -->
+  <script src="js/bridge.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/tree.js"></script>
+  <script src="js/viewer.js"></script>
+  <script src="js/modals.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
