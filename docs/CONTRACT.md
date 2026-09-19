@@ -99,6 +99,18 @@ scope 约定：`local`=本机 tmux（PATH 中的 `tmux`，不可用时报告如�
 6. 选项查看/编辑（ShowOptions/SetOption）、tmux 命令提示符（RunTmuxCommand）
 7. scope 切换器（local tmux / psmux / 各 SSH 服务器），顶部下拉
 
+## Debug RPC（--debug 开关）
+- 启动参数 `--debug [port]`（默认端口 8765）时，宿主额外启动 HTTP JSON-RPC 服务，
+  仅绑定 `127.0.0.1`（窗口标题追加 " [debug:port]" 便于识别）。
+- 端点 `POST /rpc`：请求体 `{"method":"<Bridge方法名>","params":["参数1", ...]}`，
+  通过反射按方法名调用 Bridge 对应方法（params 元素按声明参数类型转换：string/int/bool），
+  返回 Bridge 的 JSON 字符串原样作为响应体（application/json）。
+  方法不存在返回 `{"ok":false,"error":"unknown method: X"}`，参数不匹配/转换失败返回
+  `{"ok":false,"error":"..."}`；HTTP 状态一律 200（错误在 body 内表达）。
+- 端点 `GET /methods`：返回全部可调用方法名数组（JSON）。
+- 用途：外部 agent 无需 GUI 交互即可调试 tmux 操作（list/capture/send-keys 等）。
+- 日志：debug 模式下把每次 RPC 调用（方法名+耗时）追加到 `%LOCALAPPDATA%\tmux-gui\debug.log`。
+
 ## 质量红线
 - 后端：`dotnet build` 零警告零错误；所有 tmux 输出解析对空输出/会话不存在容错
 - 前端：Chrome 108+ 语法（WebView2 Evergreen），中文 UI 文案，深色主题

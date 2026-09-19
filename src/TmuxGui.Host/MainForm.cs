@@ -1,5 +1,6 @@
 using Microsoft.Web.WebView2.WinForms;
 using TmuxGui.Host.Bridge;
+using BridgeClass = TmuxGui.Host.Bridge.Bridge;
 
 namespace TmuxGui.Host;
 
@@ -7,10 +8,14 @@ namespace TmuxGui.Host;
 public sealed class MainForm : Form
 {
     private readonly WebView2 _webView;
+    private readonly BridgeClass _bridge;
+    private readonly int? _debugPort;
 
-    public MainForm()
+    public MainForm(BridgeClass bridge, int? debugPort = null)
     {
-        Text = "tmux-gui";
+        _bridge = bridge;
+        _debugPort = debugPort;
+        Text = debugPort is { } p ? $"tmux-gui [debug:{p}]" : "tmux-gui";
         Width = 1280;
         Height = 800;
         StartPosition = FormStartPosition.CenterScreen;
@@ -41,7 +46,7 @@ public sealed class MainForm : Form
         core.SetVirtualHostNameToFolderMapping(
             "app.local", WwwRootPath(),
             Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
-        core.AddHostObjectToScript("bridge", new global::TmuxGui.Host.Bridge.Bridge());
+        core.AddHostObjectToScript("bridge", _bridge);
         core.Navigate("https://app.local/index.html");
     }
 }
